@@ -544,6 +544,8 @@ public:
 			indices.data()));
 	}
 
+#define COMBINE_IMAGE_SAMPLER 0
+
 	void setupVertexDescriptions()
 	{
 		// Binding description
@@ -592,7 +594,9 @@ public:
 		std::vector<VkDescriptorPoolSize> poolSizes =
 		{
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
+			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1),
+			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1),
+			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, 1)
 		};
 
 		VkDescriptorPoolCreateInfo descriptorPoolInfo = 
@@ -614,10 +618,31 @@ public:
 				VK_SHADER_STAGE_VERTEX_BIT, 
 				0),
 			// Binding 1 : Fragment shader image sampler
+			//vks::initializers::descriptorSetLayoutBinding(
+			//	VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
+			//	VK_SHADER_STAGE_FRAGMENT_BIT, 
+			//	1)
+#if COMBINE_IMAGE_SAMPLER
+
 			vks::initializers::descriptorSetLayoutBinding(
-				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 
-				VK_SHADER_STAGE_FRAGMENT_BIT, 
-				1)
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				VK_SHADER_STAGE_FRAGMENT_BIT,
+				1),
+#else
+
+			vks::initializers::descriptorSetLayoutBinding(
+				VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+				VK_SHADER_STAGE_FRAGMENT_BIT,
+				1),
+
+			vks::initializers::descriptorSetLayoutBinding(
+				VK_DESCRIPTOR_TYPE_SAMPLER,
+				VK_SHADER_STAGE_FRAGMENT_BIT,
+				2),
+
+
+#endif
+
 		};
 
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = 
@@ -643,14 +668,14 @@ public:
 				&descriptorSetLayout,
 				1);
 
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet));
+		VK_CHECK_RESULT(vkAllocateDescriptorSets( device, &allocInfo, &descriptorSet ));
 
 		// Setup a descriptor image info for the current texture to be used as a combined image sampler
 		VkDescriptorImageInfo textureDescriptor;
 		textureDescriptor.imageView = texture.view;				// The image's view (images are never directly accessed by the shader, but rather through views defining subresources)
 		textureDescriptor.sampler = texture.sampler;			// The sampler (Telling the pipeline how to sample the texture, including repeat, border, etc.)
 		textureDescriptor.imageLayout = texture.imageLayout;	// The current layout of the image (Note: Should always fit the actual use, e.g. shader read)
-
+  
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets =
 		{
 			// Binding 0 : Vertex shader uniform buffer
@@ -659,13 +684,30 @@ public:
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 
 				0, 
 				&uniformBufferVS.descriptor),
+#if COMBINE_IMAGE_SAMPLER
+			// Binding 1 : Fragment shader texture sampler
+			//	Fragment shader: layout (binding = 1) uniform sampler2D samplerColor;
+			vks::initializers::writeDescriptorSet(
+				descriptorSet,
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,		// The descriptor set will use a combined image sampler (sampler and image could be split)
+				1,												// Shader binding point 1
+				&textureDescriptor)								// Pointer to the descriptor image for our texture
+#else		
+			
 			// Binding 1 : Fragment shader texture sampler
 			//	Fragment shader: layout (binding = 1) uniform sampler2D samplerColor;
 			vks::initializers::writeDescriptorSet(
 				descriptorSet, 				
-				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,		// The descriptor set will use a combined image sampler (sampler and image could be split)
+				VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,		// The descriptor set will use a combined image sampler (sampler and image could be split)
 				1,												// Shader binding point 1
 				&textureDescriptor)								// Pointer to the descriptor image for our texture
+			,
+			vks::initializers::writeDescriptorSet(
+				descriptorSet,
+				VK_DESCRIPTOR_TYPE_SAMPLER,		// The descriptor set will use a combined image sampler (sampler and image could be split)
+				2,												// Shader binding point 1
+				&textureDescriptor)								// Pointer to the descriptor image for our texture
+#endif
 		};
 
 		vkUpdateDescriptorSets(device, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, NULL);
@@ -723,8 +765,11 @@ public:
 		// Load shaders
 		std::array<VkPipelineShaderStageCreateInfo,2> shaderStages;
 
-		shaderStages[0] = loadShader(getAssetPath() + "shaders/texture/texture.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-		shaderStages[1] = loadShader(getAssetPath() + "shaders/texture/texture.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+		shaderStages[0] = loadShader(getAssetPath() + "shaders/texture/TextureShaderVert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+		shaderStages[1] = loadShader(getAssetPath() + "shaders/texture/TextureShaderFrag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+		shaderStages[0].pName = "TextureVS";
+		shaderStages[1].pName = "TexturePS";
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo =
 			vks::initializers::pipelineCreateInfo(
@@ -743,7 +788,7 @@ public:
 		pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStages.size());
 		pipelineCreateInfo.pStages = shaderStages.data();
 
-		VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines.solid));
+		VK_CHECK_RESULT(      vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineCreateInfo, nullptr, &pipelines.solid));
 	}
 
 	// Prepare and initialize uniform buffer containing shader uniforms
