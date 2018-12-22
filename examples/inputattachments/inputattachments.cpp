@@ -88,8 +88,6 @@ public:
 	};
 	std::vector<Attachments> attachments;
 
-	VkRenderPass uiRenderPass;
-	
 	VulkanExample() : VulkanExampleBase(ENABLE_VALIDATION)
 	{
 		title = "Input attachments";
@@ -99,6 +97,7 @@ public:
 		camera.setRotation(glm::vec3(-12.75f, 380.0f, 0.0f));
 		camera.setPerspective(60.0f, (float)width / (float)height, 0.1f, 256.0f);
 		settings.overlay = true;
+		UIOverlay.subpass = 1;
 	}
 
 	~VulkanExample()
@@ -123,8 +122,6 @@ public:
 
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.attachmentWrite, nullptr);
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayouts.attachmentRead, nullptr);
-
-		vkDestroyRenderPass(device, uiRenderPass, nullptr);
 
 		scene.destroy();
 		uniformBuffers.matrices.destroy();
@@ -329,11 +326,6 @@ public:
 		renderPassInfoCI.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassInfoCI.pDependencies = dependencies.data();
 		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfoCI, nullptr, &renderPass));
-
-		// Create custom overlay render pass
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-		attachments[0].initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		VK_CHECK_RESULT(vkCreateRenderPass(device, &renderPassInfoCI, nullptr, &uiRenderPass));
 	}
 
 	void buildCommandBuffers()
@@ -400,6 +392,8 @@ public:
 
 				vks::debugmarker::endRegion(drawCmdBuffers[i]);
 			}
+
+			drawUI(drawCmdBuffers[i]);
 
 			vkCmdEndRenderPass(drawCmdBuffers[i]);
 
@@ -613,21 +607,6 @@ public:
 		if (camera.updated) {
 			updateUniformBuffers();
 		}
-	}
-
-	// UI overlay configuration needs to be adjusted for this example (renderpass setup, attachment count, etc.)
-	virtual void OnSetupUIOverlay(vks::UIOverlayCreateInfo &createInfo)
-	{
-		createInfo.renderPass = uiRenderPass;
-		createInfo.framebuffers = frameBuffers;
-		createInfo.targetSubpass = 1;
-		createInfo.subpassCount = 2;
-		createInfo.attachmentCount = 1;
-		createInfo.clearValues = {
-			{ { 0.0f, 0.0f, 0.0f, 0.0f } },
-			{ { 0.0f, 0.0f, 0.0f, 0.0f } },
-			{ { 1.0f, 0 } },
-		};
 	}
 
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay)

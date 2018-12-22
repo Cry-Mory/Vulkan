@@ -4,7 +4,28 @@ A comprehensive collection of open source C++ examples for [Vulkan®](https://ww
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=BHXPMV6ZKPH9E)
 
-## Cloning
+## Table of Contents
++ [Cloning](#Cloning)
++ [Assets](#Assets)
++ [Building](#Building)
++ [Examples](#Examples)
+    + [Basics](#Basics)
+    + [Advanced](#Advanced)
+    + [Performance](#Performance)
+    + [Physically Based Rendering](#PBR)
+    + [Deferred](#Deferred)
+    + [Compute Shader](#ComputeShader)
+    + [Geometry Shader](#GeometryShader)
+    + [Tessellation Shader](#TessellationShader)
+    + [Headless](#Headless)
+    + [User Interface](#UserInterface)
+    + [Effects](#Effects)
+    + [Extensions](#Extensions)
+    + [Misc](#Misc)
++ [Credits and Attributions](#CreditsAttributions)
+
+
+## <a name="Cloning"></a> Cloning
 This repository contains submodules for external dependencies, so when doing a fresh clone you need to clone recursively:
 
 ```
@@ -18,22 +39,22 @@ git submodule init
 git submodule update
 ```
 
-## Assets
+## <a name="Assets"></a> Assets
 Many examples require assets from the asset pack that is not part of this repository due to file size. A python script is included to download the asset pack that. Run
 
     python download_assets.py
 
 from the root of the repository after cloning or see [this](data/README.md) for manual download.
 
-## Building
+## <a name="Building"></a> Building
 
 The repository contains everything required to compile and build the examples on <img src="./images/windowslogo.png" alt="" height="22px" valign="bottom"> Windows, <img src="./images/linuxlogo.png" alt="" height="24px" valign="bottom"> Linux, <img src="./images/androidlogo.png" alt="" height="24px" valign="bottom"> Android, <img src="./images/applelogo.png" alt="" valign="bottom" height="24px"> iOS and macOS (using MoltenVK) using a C++ compiler that supports C++11.
 
 See [BUILD.md](BUILD.md) for details on how to build for the different platforms.
 
-## Examples
+## <a name="Examples"></a> Examples
 
-### Basics
+### <a name="Basics"></a> Basics
 
 #### [01 - Triangle](examples/triangle/)
 Basic and verbose example for getting a colored triangle rendered to the screen using Vulkan. This is meant as a starting point for learning Vulkan from the ground up. A huge part of the code is boilerplate that is abstracted away in later examples.
@@ -78,23 +99,27 @@ Generates a 3D texture on the cpu (using perlin noise), uploads it to the device
 
 Loads a 3D model and texture maps from a common file format (using [assimp](https://github.com/assimp/assimp)), uploads the vertex and index buffer data to video memory, sets up a matching vertex layout and renders the 3D model.
 
-#### [12 - Sub passes](examples/subpasses/)
+#### [12 - Input attachments](examples/inputattachments)
 
-Uses sub passes and input attachments to write and read back data from framebuffer attachments (same location only) in single render pass. This is used to implement deferred render composition with added forward transparency in a single pass. 
+Uses input attachments to read framebuffer contents from a previous sub pass at the same pixel position within a single render pass. This can be used for basic post processing or image composition ([blog entry](https://www.saschawillems.de/?p=3055)).
 
-#### [13 - Offscreen rendering](examples/offscreen/)
+#### [13 - Sub passes](examples/subpasses/)
+
+Advanced example that sses sub passes and input attachments to write and read back data from framebuffer attachments (same location only) in single render pass. This is used to implement deferred render composition with added forward transparency in a single pass. 
+
+#### [14 - Offscreen rendering](examples/offscreen/)
 
 Basic offscreen rendering in two passes. First pass renders the mirrored scene to a separate framebuffer with color and depth attachments, second pass samples from that color attachment for rendering a mirror surface.
 
-#### [14 - CPU particle system](examples/particlefire/)
+#### [15 - CPU particle system](examples/particlefire/)
 
 Implements a simple CPU based particle system. Particle data is stored in host memory, updated on the CPU per-frame and synchronized with the device before it's rendered using pre-multiplied alpha.
 
-#### [15 - Stencil buffer](examples/stencilbuffer/)
+#### [16 - Stencil buffer](examples/stencilbuffer/)
 
 Uses the stencil buffer and it's compare functionality for rendering a 3D model with dynamic outlines.
 
-### Advanced
+### <a name="Advanced"></a> Advanced
 
 #### [01 - Scene rendering](examples/scenerendering/)
 
@@ -132,7 +157,7 @@ Loads and renders an animated skinned 3D model. Skinning is done on the GPU by p
 
 Capturing and saving an image after a scene has been rendered using blits to copy the last swapchain image from optimal device to host local linear memory, so that it can be stored into a ppm image.
 
-### Performance
+### <a name="Performance"></a> Performance
 
 #### [01 - Multi threaded command buffer generation](examples/multithreading/)
 
@@ -154,7 +179,7 @@ Using query pool objects to get number of passed samples for rendered primitives
 
 Using query pool objects to gather statistics from different stages of the pipeline like vertex, fragment shader and tessellation evaluation shader invocations depending on payload.
 
-### Physically based rendering
+### <a name="PBR"></a> Physically Based Rendering
 
 Physical based rendering as a lighting technique that achieves a more realistic and dynamic look by applying approximations of bidirectional reflectance distribution functions based on measured real-world material parameters and environment lighting.
 
@@ -170,7 +195,7 @@ Adds image based lighting from an hdr environment cubemap to the PBR equation, u
 
 Renders a model specially crafted for a metallic-roughness PBR workflow with textures defining material parameters for the PRB equation (albedo, metallic, roughness, baked ambient occlusion, normal maps) in an image based lighting environment.
 
-### Deferred
+### <a name="Deferred"></a> Deferred
 
 These examples use a [deferred shading](https://en.wikipedia.org/wiki/Deferred_shading) setup.
 
@@ -190,7 +215,7 @@ Adds shadows from multiple spotlights to a deferred renderer using a layered dep
 
 Adds ambient occlusion in screen space to a 3D scene. Depth values from a previous deferred pass are used to generate an ambient occlusion texture that is blurred before being applied to the scene in a final composition path.
 
-### Compute shader
+### <a name="ComputeShader"></a> Compute Shader
 
 #### [01 - Image processing](examples/computeshader/)
 
@@ -216,7 +241,7 @@ Mass-spring based cloth system on the GPU using a compute shader to calculate an
 
 Purely GPU based frustum visibility culling and level-of-detail system. A compute shader is used to modify draw commands stored in an indirect draw commands buffer to toggle model visibility and select it's level-of-detail based on camera distance, no calculations have to be done on and synced with the CPU.
 
-### Geometry shader
+### <a name="GeometryShader"></a> Geometry Shader
 
 #### [01 - Normal debugging](examples/geometryshader/)
 
@@ -226,7 +251,7 @@ Visualizing per-vertex model normals (for debugging). First pass renders the pla
 
 Renders a scene to multiple viewports in one pass using a geometry shader to apply different matrices per viewport to simulate stereoscopic rendering (left/right). Requires a device with support for ```multiViewport```.
 
-### Tessellation shader
+### <a name="TessellationShader"></a> Tessellation Shader
 
 #### [01 - Displacement mapping](examples/tessellation/)
 
@@ -240,7 +265,7 @@ Renders a terrain using tessellation shaders for height displacement (based on a
 
 Uses curved PN-triangles ([paper](http://alex.vlachos.com/graphics/CurvedPNTriangles.pdf)) for adding details to a low-polygon model.
 
-### Headless 
+### <a name="Headless"></a> Headless 
 
 Examples that run one-time tasks and don't make use of visual output (no window system integration). These can be run in environments where no user interface is available ([blog entry](https://www.saschawillems.de/?p=2719)).
 
@@ -252,7 +277,7 @@ Renders a basic scene to a (non-visible) frame buffer attachment, reads it back 
 
 Only uses compute shader capabilities for running calculations on an input data set (passed via SSBO). A fibonacci row is calculated based on input data via the compute shader, stored back and displayed via command line.
 
-### User interface
+### <a name="UserInterface"></a> User Interface
 
 #### [01 - Text rendering](examples/textoverlay/)
 
@@ -266,7 +291,7 @@ Uses a texture that stores signed distance field information per character along
 
 Generates and renders a complex user interface with multiple windows, controls and user interaction on top of a 3D scene. The UI is generated using [Dear ImGUI](https://github.com/ocornut/imgui) and updated each frame.
 
-### Effects
+### <a name="Effects"></a> Effects
 
 #### [01 - Fullscreen radial blur](examples/radialblur/)
 
@@ -284,7 +309,7 @@ Implements multiple texture mapping methods to simulate depth based on texture i
 
 Uses a spherical material capture texture array defining environment lighting and reflection information to fake complex lighting. 
 
-### Extensions
+### <a name="Extensions"></a> Extensions
 
 #### [01 - Conservative rasterization (VK_EXT_conservative_rasterization)](examples/conservativeraster/)
 
@@ -294,15 +319,23 @@ Uses conservative rasterization to change the way fragments are generated by the
 
 Uses push descriptors apply the push constants concept to descriptor sets. Instead of creating per-object descriptor sets for rendering multiple objects, this example passes descriptors at command buffer creation time.
 
-#### [03 - Multiview rendering (VK_KHR_multiview)](examples/multiview/)
+#### [03 - Inline uniform blocks (VK_EXT_inline_uniform_block)](examples/inlineuniformblocks/)
+
+Makes use of inline uniform blocks to pass uniform data directly at descriptor set creation time and also demonstrates how to update data for those descriptors at runtime.
+
+#### [04 - Multiview rendering (VK_KHR_multiview)](examples/multiview/)
 
 Renders a scene to to multiple views (layers) of a single framebuffer to simulate stereoscopic rendering in one pass. Broadcasting to the views is done in the vertex shader using ```gl_ViewIndex```.
 
-#### [04 - Debug markers (VK_EXT_debug_marker)](examples/debugmarker/)
+#### [05 - Conditional rendering (VK_EXT_conditional_rendering)](examples/conditionalrender)
+
+Demonstrates the use of VK_EXT_conditional_rendering to conditionally dispatch render commands based on values from a dedicated buffer. This allows e.g. visibility toggles without having to rebuild command buffers ([blog post](https://www.saschawillems.de/?p=3098)).
+
+#### [06 - Debug markers (VK_EXT_debug_marker)](examples/debugmarker/)
 
 Uses the VK_EXT_debug_marker extension to set debug markers, regions and to name Vulkan objects for advanced debugging in graphics debuggers like [RenderDoc](https://www.renderdoc.org). Details can be found in [this tutorial](https://www.saschawillems.de/?page_id=2017).
 
-### Misc
+### <a name="Misc"></a> Misc
 
 #### [01 - Vulkan Gears](examples/gears/)
 
@@ -312,5 +345,5 @@ Vulkan interpretation of glxgears. Procedurally generates and animates multiple 
 
 Renders a Vulkan demo scene with logos and mascots. Not an actual example but more of a playground and showcase.
 
-## Credits and attributions
+## <a name="CreditsAttributions"></a> Credits and Attributions
 See [CREDITS.md](CREDITS.md) for additional credits and attributions.

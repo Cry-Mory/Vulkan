@@ -25,6 +25,8 @@ function(buildExample EXAMPLE_NAME)
 		target_link_libraries(${EXAMPLE_NAME} base )
 	endif(WIN32)
 
+	set_target_properties(${EXAMPLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
 	if(RESOURCE_INSTALL_DIR)
 		install(TARGETS ${EXAMPLE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR})
 	endif()
@@ -45,6 +47,7 @@ set(EXAMPLES
 	computenbody
 	computeparticles
 	computeshader
+	conditionalrender
 	conservativeraster
 	debugmarker
 	deferred
@@ -59,6 +62,7 @@ set(EXAMPLES
 	hdr
 	imgui
 	indirectdraw
+	inlineuniformblocks
 	inputattachments
 	instancing
 	mesh

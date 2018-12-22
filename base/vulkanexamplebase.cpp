@@ -195,26 +195,14 @@ void VulkanExampleBase::prepare()
 	setupFrameBuffer();
 	settings.overlay = settings.overlay && (!benchmark.active);
 	if (settings.overlay) {
-		vks::UIOverlayCreateInfo overlayCreateInfo = {};
-		// Setup default overlay creation info
-		overlayCreateInfo.device = vulkanDevice;
-		overlayCreateInfo.copyQueue = queue;
-		overlayCreateInfo.framebuffers = frameBuffers;
-		overlayCreateInfo.colorformat = swapChain.colorFormat;
-		overlayCreateInfo.depthformat = depthFormat;
-		overlayCreateInfo.width = width;
-		overlayCreateInfo.height = height;
-		// Virtual function call for example to customize overlay creation
-		OnSetupUIOverlay(overlayCreateInfo);
-		// Load default shaders if not specified by example
-		if (overlayCreateInfo.shaders.size() == 0) {
-			overlayCreateInfo.shaders = {
-				loadShader(getAssetPath() + "shaders/base/uioverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
-				loadShader(getAssetPath() + "shaders/base/uioverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
-			};
-		}
-		UIOverlay = new vks::UIOverlay(overlayCreateInfo);
-		updateOverlay();
+		UIOverlay.device = vulkanDevice;
+		UIOverlay.queue = queue;
+		UIOverlay.shaders = {
+			loadShader(getAssetPath() + "shaders/base/uioverlay.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+			loadShader(getAssetPath() + "shaders/base/uioverlay.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
+		};
+		UIOverlay.prepareResources();
+		UIOverlay.preparePipeline(pipelineCache, renderPass);
 	}
 }
 
@@ -590,10 +578,10 @@ void VulkanExampleBase::updateOverlay()
 	ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / lastFPS), lastFPS);
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f * UIOverlay->scale));
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f * UIOverlay.scale));
 #endif
-	ImGui::PushItemWidth(110.0f * UIOverlay->scale);
-	OnUpdateUIOverlay(UIOverlay);
+	ImGui::PushItemWidth(110.0f * UIOverlay.scale);
+	OnUpdateUIOverlay(&UIOverlay);
 	ImGui::PopItemWidth();
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 	ImGui::PopStyleVar();
@@ -603,13 +591,28 @@ void VulkanExampleBase::updateOverlay()
 	ImGui::PopStyleVar();
 	ImGui::Render();
 
-	UIOverlay->update();
+	if (UIOverlay.update() || UIOverlay.updated) {
+		buildCommandBuffers();
+		UIOverlay.updated = false;
+	}
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 	if (mouseButtons.left) {
 		mouseButtons.left = false;
 	}
 #endif
+}
+
+void VulkanExampleBase::drawUI(const VkCommandBuffer commandBuffer)
+{
+	if (settings.overlay) {
+		const VkViewport viewport = vks::initializers::viewport((float)width, (float)height, 0.0f, 1.0f);
+		const VkRect2D scissor = vks::initializers::rect2D(width, height, 0, 0);
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+		UIOverlay.draw(commandBuffer);
+	}
 }
 
 void VulkanExampleBase::prepareFrame()
@@ -627,38 +630,7 @@ void VulkanExampleBase::prepareFrame()
 
 void VulkanExampleBase::submitFrame()
 {
-	bool submitOverlay = settings.overlay && UIOverlay->visible;
-
-	if (submitOverlay) {
-		// Wait for color attachment output to finish before rendering the text overlay
-		VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		submitInfo.pWaitDstStageMask = &stageFlags;
-
-		// Set semaphores
-		// Wait for render complete semaphore
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &semaphores.renderComplete;
-		// Signal ready with UI overlay complete semaphpre
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &semaphores.overlayComplete;
-
-		// Submit current UI overlay command buffer
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &UIOverlay->cmdBuffers[currentBuffer];
-		VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-
-		// Reset stage mask
-		submitInfo.pWaitDstStageMask = &submitPipelineStages;
-		// Reset wait and signal semaphores for rendering next frame
-		// Wait for swap chain presentation to finish
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &semaphores.presentComplete;
-		// Signal ready with offscreen semaphore
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &semaphores.renderComplete;
-	}
-
-	VkResult res = swapChain.queuePresent(queue, currentBuffer, submitOverlay ? semaphores.overlayComplete : semaphores.renderComplete);
+	VkResult res = swapChain.queuePresent(queue, currentBuffer, semaphores.renderComplete);
 	if (!((res == VK_SUCCESS) || (res == VK_SUBOPTIMAL_KHR))) {
 		if (res == VK_ERROR_OUT_OF_DATE_KHR) {
 			// Swap chain is no longer compatible with the surface and needs to be recreated
@@ -668,7 +640,6 @@ void VulkanExampleBase::submitFrame()
 			VK_CHECK_RESULT(res);
 		}
 	}
-
 	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
 }
 
@@ -809,13 +780,12 @@ VulkanExampleBase::~VulkanExampleBase()
 
 	vkDestroySemaphore(device, semaphores.presentComplete, nullptr);
 	vkDestroySemaphore(device, semaphores.renderComplete, nullptr);
-	vkDestroySemaphore(device, semaphores.overlayComplete, nullptr);
 	for (auto& fence : waitFences) {
 		vkDestroyFence(device, fence, nullptr);
 	}
 
-	if (UIOverlay) {
-		delete UIOverlay;
+	if (settings.overlay) {
+		UIOverlay.freeResources();
 	}
 
 	delete vulkanDevice;
@@ -981,10 +951,6 @@ bool VulkanExampleBase::initVulkan()
 	// Create a semaphore used to synchronize command submission
 	// Ensures that the image is not presented until all commands have been sumbitted and executed
 	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.renderComplete));
-	// Create a semaphore used to synchronize command submission
-	// Ensures that the image is not presented until all commands for the UI overlay have been sumbitted and executed
-	// Will be inserted after the render complete semaphore if the UI overlay is enabled
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.overlayComplete));
 
 	// Set up submit info structure
 	// Semaphores will stay the same during application lifetime
@@ -1180,7 +1146,7 @@ void VulkanExampleBase::handleMessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPAR
 			break;
 		case KEY_F1:
 			if (settings.overlay) {
-				UIOverlay->visible = !UIOverlay->visible;
+				UIOverlay.visible = !UIOverlay.visible;
 			}
 			break;
 		case KEY_ESCAPE:
@@ -2166,6 +2132,12 @@ void VulkanExampleBase::windowResize()
 	}
 	setupFrameBuffer();
 
+	if ((width > 0.0f) && (height > 0.0f)) {
+		if (settings.overlay) {
+			UIOverlay.resize(width, height);
+		}
+	}
+
 	// Command buffers need to be recreated as they may store
 	// references to the recreated frame buffer
 	destroyCommandBuffers();
@@ -2175,9 +2147,6 @@ void VulkanExampleBase::windowResize()
 	vkDeviceWaitIdle(device);
 
 	if ((width > 0.0f) && (height > 0.0f)) {
-		if (settings.overlay) {
-			UIOverlay->resize(width, height, frameBuffers);
-		}
 		camera.updateAspectRatio((float)width / (float)height);
 	}
 
@@ -2253,5 +2222,4 @@ void VulkanExampleBase::setupSwapChain()
 	swapChain.create(&width, &height, settings.vsync);
 }
 
-void VulkanExampleBase::OnSetupUIOverlay(vks::UIOverlayCreateInfo &createInfo) {}
 void VulkanExampleBase::OnUpdateUIOverlay(vks::UIOverlay *overlay) {}
